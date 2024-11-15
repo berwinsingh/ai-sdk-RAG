@@ -1,9 +1,9 @@
 import fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { FastifyRequest } from 'fastify';
-import { z } from 'zod';
+import { ZodTypeProvider } from "fastify-type-provider-zod";
+import { FastifyRequest } from "fastify";
+import { z } from "zod";
 
 const app = fastify();
 app.withTypeProvider<ZodTypeProvider>();
@@ -11,7 +11,6 @@ app.setValidatorCompiler(({ schema, method, url, httpPart }) => {
   return (data) => (schema as z.ZodType).safeParse(data);
 });
 
-// Register Swagger
 await app.register(swagger, {
   swagger: {
     info: {
@@ -22,7 +21,6 @@ await app.register(swagger, {
   },
 });
 
-// Register Swagger UI
 await app.register(swaggerUi, {
   routePrefix: "/docs",
   uiConfig: {
@@ -37,30 +35,43 @@ app.get(
   {
     schema: {
       description: "Train vector embeddings and store them in Pinecone.",
-      querystring: z.object({
-        filePath: z.string().min(1),
-      }),
-      response: {
-        200: z.object({
-          status: z.string(),
-        }),
-        400: z.object({
-          error: z.string(),
-        }),
+      querystring: {
+        type: 'object',
+        required: ['filePath'],
+        properties: {
+          filePath: { type: 'string', minLength: 1 }
+        }
       },
-    },
+      response: {
+        200: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { type: 'string' }
+          }
+        },
+        400: {
+          type: 'object',
+          required: ['error'],
+          properties: {
+            error: { type: 'string' }
+          }
+        }
+      }
+    }
   },
-  async (request: FastifyRequest<{
-    Querystring: { filePath: string }
-  }>) => {
+  async (
+    request: FastifyRequest<{
+      Querystring: { filePath: string };
+    }>,
+    reply
+  ) => {
     const { filePath } = request.query;
-    console.log(filePath);
-
     try {
       // Your training logic here
       return { status: "Training completed" };
     } catch (error) {
-      throw new Error("Training failed");
+      return reply.status(400).send({ error: "Training failed" });
     }
   }
 );
@@ -73,12 +84,24 @@ app.get("/health", () => {
 const start = async () => {
   try {
     await app.listen({ port: 3000 });
-    console.log(`Server listening on http://localhost:3000`);
-    console.log("Documentation available at http://localhost:3000/docs");
+    console.log("Server is now listening on:", app.server.address());
+    console.log(`Documentation available at http://localhost:3000/docs`);
   } catch (err) {
+    console.error("Error starting server:", err);
     app.log.error(err);
     process.exit(1);
   }
 };
+
+// Add error handlers for process events
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+  process.exit(1);
+});
 
 start();
