@@ -1,15 +1,29 @@
 import dotenv from 'dotenv';
-import { Pinecone } from "@pinecone-database/pinecone";
+import { Pinecone as PineconeClient } from "@pinecone-database/pinecone";
+import { PineconeStore } from "@langchain/pinecone";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import {z} from "zod"
 
 dotenv.config();
 
-const pc = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY!,
-});
+const TrainingInputSchema = z.object({
+  filePath: z.string().min(1),
+})
+
+export type TrainingInput = z.infer<typeof TrainingInputSchema>;
+
+const embeddings = new OpenAIEmbeddings({
+  model:"text-embedding-3-small",
+  apiKey:process.env.OPENAI_API_KEY!
+})
+
+const pinecone = new PineconeClient({apiKey:process.env.PINECONE_API_KEY!});
+const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX!);
+
 
 const getIndexes = async () => {
   const indexes = async () => {
-    return await pc.listIndexes();
+    return await pinecone.listIndexes();
   };
   
   indexes().then((response) => {
@@ -17,4 +31,6 @@ const getIndexes = async () => {
   });
 };
 
-export default getIndexes;
+const trainVectorEmbeddings = (data:TrainingInput) =>{
+  const validated = TrainingInputSchema.parse(data)
+}
