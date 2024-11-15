@@ -3,6 +3,8 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { FastifyRequest } from "fastify";
 import trainVectorEmbeddings from "./pinecone.js";
+import getOpenAIResponse from "./ai-configs/openai_setting.js";
+import { Schema } from "zod";
 
 const app = fastify();
 
@@ -71,6 +73,47 @@ app.post(
       console.error("Training error details:", error);
       return reply.status(400).send({ 
         error: error instanceof Error ? error.message : "Training failed"
+      });
+    }
+  }
+);
+
+//Get OpenAI Response
+app.post("/chat", {
+  schema: {
+    body: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: { type: "string", minLength: 1 },
+      },
+    },
+    response: {
+      200: {
+        type: "object",
+        required: ["response"],
+        properties: {
+          response: { type: "string" },
+        },
+      },
+      400: {
+        type: "object",
+        required: ["error"],
+        properties: {
+          error: { type: "string" },
+        },
+      },
+    },
+  },
+}, async (request: FastifyRequest<{ Body: { query: string } }>, reply) => {
+  try{  
+    const { query } = request.body;
+    const response = await getOpenAIResponse({ query });
+      return { response };
+    } catch (error) {
+      console.error("Error getting OpenAI response:", error);
+      return reply.status(400).send({
+        error: error instanceof Error ? error.message : "Error getting OpenAI response",
       });
     }
   }
