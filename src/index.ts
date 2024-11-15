@@ -4,7 +4,6 @@ import swaggerUi from "@fastify/swagger-ui";
 import { FastifyRequest } from "fastify";
 import trainVectorEmbeddings from "./pinecone.js";
 import getOpenAIResponse from "./ai-configs/openai_setting.js";
-import { Schema } from "zod";
 
 const app = fastify();
 
@@ -108,8 +107,8 @@ app.post("/chat", {
 }, async (request: FastifyRequest<{ Body: { query: string } }>, reply) => {
   try{  
     const { query } = request.body;
-    const response = await getOpenAIResponse({ query });
-      return { response };
+    const { response, usage } = await getOpenAIResponse({ query });
+      return { response, usage };
     } catch (error) {
       console.error("Error getting OpenAI response:", error);
       return reply.status(400).send({
