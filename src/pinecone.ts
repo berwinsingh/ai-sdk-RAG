@@ -1,36 +1,123 @@
-import dotenv from 'dotenv';
-import { Pinecone as PineconeClient } from "@pinecone-database/pinecone";
-import { PineconeStore } from "@langchain/pinecone";
+import dotenv from "dotenv";
+import { Pinecone } from "@pinecone-database/pinecone";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import {z} from "zod"
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { S3Loader } from "@langchain/community/document_loaders/web/s3";
+import { z } from "zod";
 
 dotenv.config();
 
 const TrainingInputSchema = z.object({
-  filePath: z.string().min(1),
-})
+  bucket: z.string().min(1).optional(),
+  key: z.string().min(1),
+});
 
-export type TrainingInput = z.infer<typeof TrainingInputSchema>;
+type TrainingInput = z.infer<typeof TrainingInputSchema>;
 
 const embeddings = new OpenAIEmbeddings({
-  model:"text-embedding-3-small",
-  apiKey:process.env.OPENAI_API_KEY!
-})
+  model: "text-embedding-3-small",
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
-const pinecone = new PineconeClient({apiKey:process.env.PINECONE_API_KEY!});
-const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX!);
+const pc = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY!,
+});
 
+const pineconeIndex = process.env.PINECONE_INDEX!;
 
-const getIndexes = async () => {
-  const indexes = async () => {
-    return await pinecone.listIndexes();
-  };
-  
-  indexes().then((response) => {
-    console.log("My indexes: ", response);
-  });
+const getIndexes = async (indexName: string): Promise<boolean> => {
+  const response = await pc.listIndexes();
+  return response.indexes?.some((index) => index.name === indexName) ?? false;
 };
 
-const trainVectorEmbeddings = (data:TrainingInput) =>{
-  const validated = TrainingInputSchema.parse(data)
-}
+const trainVectorEmbeddings = async (data: TrainingInput) => {
+  const validated = TrainingInputSchema.parse(data);
+  
+  // Initialize S3 loader
+  const loader = new S3Loader({
+    bucket: validated.bucket ?? process.env.BUCKET!,
+    key: validated.key,
+    s3Config: {
+      region: process.env.AWS_REGION || "us-east-1",
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      },
+    },
+    unstructuredAPIURL: process.env.UNSTRUCTURED_API_URL!,
+    unstructuredAPIKey: process.env.UNSTRUCTURED_API_KEY!,
+  });
+
+  // Load and process the document
+  const docs = await loader.load();
+  
+  // Split text into chunks using RecursiveCharacterTextSplitter
+  const textSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+    separators: ["\n\n", "\n", " ", ""], // Default separators
+    lengthFunction: (text) => text.length,
+  });
+  const splitDocs = await textSplitter.splitDocuments(docs);
+
+  const indexExists = await getIndexes(pineconeIndex);
+  console.log(`Index ${pineconeIndex} exists:`, indexExists);
+
+  if (!indexExists) {
+    try {
+      await pc.createIndex({
+        name: pineconeIndex,
+        dimension: 1536,
+        metric: "cosine",
+        spec: {
+          serverless: {
+            cloud: "aws",
+            region: "us-east-1",
+          },
+        },
+      });
+      console.log("Successfully created new index");
+    } catch (error) {
+      console.log("Failed to create a new index", error);
+      throw new Error("Failed to create index");
+    }
+  }
+
+  const index = pc.index(pineconeIndex);
+  
+  try {
+    // Batch process documents
+    const batchSize = 100;
+    const batches = [];
+    
+    for (let i = 0; i < splitDocs.length; i += batchSize) {
+      const batch = splitDocs.slice(i, i + batchSize);
+      const batchVectors = await Promise.all(
+        batch.map(async (doc) => {
+          const embeddingResponse = await embeddings.embedQuery(doc.pageContent);
+          return {
+            id: `doc_${Date.now()}_${Math.random()}`,
+            values: embeddingResponse,
+            metadata: {
+              bucket: validated.bucket,
+              key: validated.key,
+              pageContent: doc.pageContent,
+              ...doc.metadata
+            }
+          };
+        })
+      );
+
+      batches.push(index.upsert(batchVectors));
+    }
+
+    await Promise.all(batches);
+    
+    console.log("Successfully created/updated embeddings");
+  } catch (error) {
+    console.log("Failed to create/update embeddings", error);
+    throw new Error("Failed to create/update embeddings");
+  }
+};
+
+export default trainVectorEmbeddings;

@@ -1,15 +1,10 @@
 import fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { FastifyRequest } from "fastify";
-import { z } from "zod";
+import trainVectorEmbeddings from "./pinecone.js";
 
 const app = fastify();
-app.withTypeProvider<ZodTypeProvider>();
-app.setValidatorCompiler(({ schema, method, url, httpPart }) => {
-  return (data) => (schema as z.ZodType).safeParse(data);
-});
 
 await app.register(swagger, {
   swagger: {
@@ -67,9 +62,13 @@ app.get(
     reply
   ) => {
     const { filePath } = request.query;
+    console.log("File Path", filePath); //TODO: Remove later
+    
     try {
-      // Your training logic here
-      return { status: "Training completed" };
+      const createEmbeddings = trainVectorEmbeddings({filePath})
+      
+      console.log(createEmbeddings);
+      return { status: "Training completed. Data added to vector db." };
     } catch (error) {
       return reply.status(400).send({ error: "Training failed" });
     }
