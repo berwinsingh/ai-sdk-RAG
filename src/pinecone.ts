@@ -55,7 +55,7 @@ const trainVectorEmbeddings = async (data: TrainingInput) => {
   const textSplitter = new RecursiveCharacterTextSplitter({
     chunkSize: 1000,
     chunkOverlap: 200,
-    separators: ["\n\n", "\n", " ", ""], // Default separators
+    separators: ["\n\n", "\n", " ", ""],
     lengthFunction: (text) => text.length,
   });
   const splitDocs = await textSplitter.splitDocuments(docs);

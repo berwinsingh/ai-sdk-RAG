@@ -25,7 +25,7 @@ await app.register(swaggerUi, {
 });
 
 //Training vector embeddings
-app.get(
+app.post(
   "/train",
   {
     schema: {
