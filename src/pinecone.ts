@@ -95,15 +95,30 @@ const trainVectorEmbeddings = async (data: TrainingInput) => {
       const batchVectors = await Promise.all(
         batch.map(async (doc) => {
           const embeddingResponse = await embeddings.embedQuery(doc.pageContent);
+          // Clean metadata to ensure compatibility with Pinecone
+          const cleanMetadata = {
+            bucket: validated.bucket || process.env.BUCKET!,
+            key: validated.key,
+            pageContent: doc.pageContent,
+            // Filter and clean metadata to only include simple types
+            ...Object.entries(doc.metadata).reduce((acc, [key, value]) => {
+              // Only include string, number, boolean, or array of strings
+              if (
+                typeof value === 'string' ||
+                typeof value === 'number' ||
+                typeof value === 'boolean' ||
+                (Array.isArray(value) && value.every(item => typeof item === 'string'))
+              ) {
+                acc[key] = value;
+              }
+              return acc;
+            }, {} as Record<string, any>)
+          };
+
           return {
             id: `doc_${Date.now()}_${Math.random()}`,
             values: embeddingResponse,
-            metadata: {
-              bucket: validated.bucket,
-              key: validated.key,
-              pageContent: doc.pageContent,
-              ...doc.metadata
-            }
+            metadata: cleanMetadata
           };
         })
       );

@@ -31,29 +31,29 @@ app.get(
     schema: {
       description: "Train vector embeddings and store them in Pinecone.",
       querystring: {
-        type: 'object',
-        required: ['filePath'],
+        type: "object",
+        required: ["filePath"],
         properties: {
-          filePath: { type: 'string', minLength: 1 }
-        }
+          filePath: { type: "string", minLength: 1 },
+        },
       },
       response: {
         200: {
-          type: 'object',
-          required: ['status'],
+          type: "object",
+          required: ["status"],
           properties: {
-            status: { type: 'string' }
-          }
+            status: { type: "string" },
+          },
         },
         400: {
-          type: 'object',
-          required: ['error'],
+          type: "object",
+          required: ["error"],
           properties: {
-            error: { type: 'string' }
-          }
-        }
-      }
-    }
+            error: { type: "string" },
+          },
+        },
+      },
+    },
   },
   async (
     request: FastifyRequest<{
@@ -61,16 +61,17 @@ app.get(
     }>,
     reply
   ) => {
-    const { filePath } = request.query;
-    console.log("File Path", filePath); //TODO: Remove later
-    
+    const { filePath: fileKey } = request.query;
+    console.log("File Path", fileKey); //TODO: Remove later
+
     try {
-      const createEmbeddings = trainVectorEmbeddings({filePath})
-      
-      console.log(createEmbeddings);
-      return { status: "Training completed. Data added to vector db." };
+      const createEmbeddings = await trainVectorEmbeddings({ key: fileKey });
+      return { status: `Training completed for ${fileKey}.` };
     } catch (error) {
-      return reply.status(400).send({ error: "Training failed" });
+      console.error("Training error details:", error);
+      return reply.status(400).send({ 
+        error: error instanceof Error ? error.message : "Training failed"
+      });
     }
   }
 );

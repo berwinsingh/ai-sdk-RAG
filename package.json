@@ -15,6 +15,7 @@
   "description": "",
   "dependencies": {
     "@ai-sdk/openai": "^0.0.72",
+    "@aws-sdk/client-s3": "^3.693.0",
     "@fastify/swagger": "^9.3.0",
     "@fastify/swagger-ui": "^5.1.0",
     "@fastify/type-provider-typebox": "^5.0.1",
