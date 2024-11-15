@@ -135,4 +135,32 @@ const trainVectorEmbeddings = async (data: TrainingInput) => {
   }
 };
 
+export const getSimilarData = async (query: string) => {
+  try {
+    const queryEmbedding = await embeddings.embedQuery(query);
+
+    // Query Pinecone index
+    const index = pc.index(pineconeIndex);
+    const queryResponse = await index.query({
+      vector: queryEmbedding,
+      topK: 5,
+      includeMetadata: true,
+    });
+
+    // Extract and return relevant information from the matches
+    const matches = queryResponse.matches?.map(match => ({
+      score: match.score,
+      metadata: match.metadata,
+    })) || [];
+
+    return {
+      query,
+      matches,
+    };
+  } catch (error) {
+    console.error("Error querying vector database:", error);
+    throw new Error("Failed to retrieve similar data from vector database");
+  }
+};
+
 export default trainVectorEmbeddings;
