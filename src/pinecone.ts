@@ -153,6 +153,13 @@ export const getSimilarData = async (query: string) => {
       metadata: match.metadata,
     })) || [];
 
+    if (matches.length === 0) {
+      return {
+        query,
+        matches: "No matches found. Please upload relevant data and try again.",
+      };
+    }
+
     return {
       query,
       matches,
