@@ -17,8 +17,8 @@ const getOpenAIResponse = async (data: OpenAISetting) => {
 
   if (validated.query) {
     const similarData = await getSimilarData(validated.query);
-    console.log("Similar Data: ", similarData.matches.map(m => m.metadata?.pageContent).join('\n'));
-
+    console.log("Similar Data Found: ", similarData.matches.map(m => m.metadata?.pageContent).join('\n'));
+    
     const { text, usage, experimental_providerMetadata } = await generateText({
       model: openai("gpt-4o-mini"),
       messages: [

@@ -33,15 +33,19 @@ const getIndexes = async (indexName: string): Promise<boolean> => {
 const trainVectorEmbeddings = async (data: TrainingInput) => {
   const validated = TrainingInputSchema.parse(data);
   
+  if(!validated.bucket || !validated.key) {
+    throw new Error("Bucket and key are required to train vector embeddings.");
+  }
+  
   // Initialize S3 loader
   const loader = new S3Loader({
     bucket: validated.bucket ?? process.env.BUCKET!,
     key: validated.key,
     s3Config: {
-      region: process.env.AWS_REGION || "us-east-1",
+      region: process.env.REGION || "us-east-1",
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        accessKeyId: process.env.ACCESS_KEY_ID!,
+        secretAccessKey: process.env.SECRET_ACCESS_KEY!,
       },
     },
     unstructuredAPIURL: process.env.UNSTRUCTURED_API_URL!,
@@ -156,7 +160,12 @@ export const getSimilarData = async (query: string) => {
     if (matches.length === 0) {
       return {
         query,
-        matches: "No matches found. Please upload relevant data and try again.",
+        matches: [{
+          score: 0,
+          metadata: {
+            pageContent: "No matches found. Please upload relevant data and try again."
+          }
+        }],
       };
     }
 
